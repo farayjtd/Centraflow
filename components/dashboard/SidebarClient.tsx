@@ -16,9 +16,8 @@ type MenuItem = {
 const menuItems: MenuItem[] = [
   { label: 'Dashboard',         href: '/dashboard',                    icon: '⊞', roles: ['Admin','Owner','Teknik_Sipil','Kepala_WH','Mandor','Tukang','Sopir'] },
   { label: 'Users',             href: '/dashboard/users',              icon: '👥', roles: ['Admin'] },
-  { label: 'Warehouse',         href: '/dashboard/warehouse',         icon: '🏭', roles: ['Admin','Kepala_WH'] },
-  { label: 'Truk',              href: '/dashboard/truk',               icon: '🚛', roles: ['Admin','Kepala_WH','Sopir'] },
-  { label: 'Kategori Material', href: '/dashboard/kategori-material',  icon: '🏷️', roles: ['Admin','Teknik_Sipil'] },
+  { label: 'Warehouse',         href: '/dashboard/warehouse',          icon: '🏭', roles: ['Admin','Kepala_WH'] },
+  { label: 'Truck',             href: '/dashboard/truck',              icon: '🚛', roles: ['Admin','Kepala_WH','Sopir'] },  { label: 'Kategori Material', href: '/dashboard/kategori-material',  icon: '🏷️', roles: ['Admin','Teknik_Sipil'] },
   { label: 'Material',          href: '/dashboard/material',           icon: '📦', roles: ['Admin','Teknik_Sipil','Kepala_WH'] },
   { label: 'Stok',              href: '/dashboard/stok',               icon: '📊', roles: ['Admin','Owner','Kepala_WH'] },
   { label: 'Proyek',            href: '/dashboard/proyek',             icon: '🏗️', roles: ['Admin','Owner','Teknik_Sipil','Kepala_WH','Mandor'] },
