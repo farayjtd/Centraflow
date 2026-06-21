@@ -13,6 +13,8 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import type { ProjectStatus, UserProfile } from '@/lib/types';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const PROJECT_STATUSES: ProjectStatus[] = [
   'Panding', 'Check Material', 'Production', 'On-site Installation', 'Completed',
 ];
@@ -31,8 +33,10 @@ const approvalVariant: Record<string, 'default' | 'warning' | 'success' | 'error
   'Rejected': 'error',
 };
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 type Warehouse = { id: string; name: string };
-type Material = { id: string; material_name: string; unit: string; category: { name: string } | null };
+type Material  = { id: string; material_name: string; unit: string; category: { name: string } | null };
 
 type BOQItem = {
   id: string;
@@ -77,6 +81,8 @@ type Props = {
   currentUser: UserProfile;
 };
 
+// ─── Defaults ─────────────────────────────────────────────────────────────────
+
 const emptyForm = {
   project_name: '', client_name: '', client_address: '',
   client_phone: '', start_date: '', end_target: '',
@@ -84,59 +90,77 @@ const emptyForm = {
   boq_file_url: '',
 };
 
-const emptyBOQForm = { material_id: '', quantity_required: '' };
+const emptyBOQForm  = { material_id: '', quantity_required: '' };
+const emptyEksekusi = { mandor_id: '', installer_ids: [] as string[], truck_ids: [] as string[], driver_ids: [] as string[] };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toggleMultiSelect = (list: string[], id: string): string[] =>
   list.includes(id) ? list.filter((i) => i !== id) : [...list, id];
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function ProyekClient({ projects, warehouses, materials, currentUser }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'detail' | null>(null);
+  const supabase = createClient();
+
+  // Modal
+  const [modalMode, setModalMode]   = useState<'create' | 'edit' | 'detail' | null>(null);
   const [deleteModal, setDeleteModal] = useState<Project | null>(null);
-  const [selected, setSelected] = useState<Project | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [selected, setSelected]     = useState<Project | null>(null);
+
+  // Form proyek
+  const [form, setForm]   = useState(emptyForm);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
+
+  // Filter
+  const [search, setSearch]           = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [boqFile, setBoqFile] = useState<File | null>(null);
+
+  // BOQ file upload
+  const [boqFile, setBoqFile]         = useState<File | null>(null);
   const [uploadingBoq, setUploadingBoq] = useState(false);
   const boqFileRef = useRef<HTMLInputElement>(null);
 
-  // BOQ state untuk detail/edit existing project
-  const [boqItems, setBoqItems] = useState<BOQItem[]>([]);
+  // BOQ (existing project)
+  const [boqItems, setBoqItems]     = useState<BOQItem[]>([]);
   const [loadingBOQ, setLoadingBOQ] = useState(false);
-  const [boqForm, setBOQForm] = useState(emptyBOQForm);
-  const [boqError, setBOQError] = useState('');
-  const [editBOQ, setEditBOQ] = useState<BOQItem | null>(null);
+  const [boqForm, setBOQForm]       = useState(emptyBOQForm);
+  const [boqError, setBOQError]     = useState('');
+  const [editBOQ, setEditBOQ]       = useState<BOQItem | null>(null);
 
-  // Pending BOQ items untuk form create
-  const [pendingBOQ, setPendingBOQ] = useState<PendingBOQItem[]>([]);
+  // BOQ (pending, saat create)
+  const [pendingBOQ, setPendingBOQ]         = useState<PendingBOQItem[]>([]);
   const [pendingBOQForm, setPendingBOQForm] = useState(emptyBOQForm);
   const [pendingBOQError, setPendingBOQError] = useState('');
 
-  // Eksekusi state
-  const [eksekusiData, setEksekusiData] = useState<any>(null);
+  // Eksekusi
+  const [eksekusiData, setEksekusiData]       = useState<any>(null);
   const [loadingEksekusi, setLoadingEksekusi] = useState(false);
   const [showEksekusiForm, setShowEksekusiForm] = useState(false);
-  const [eksekusiForm, setEksekusiForm] = useState({
-    mandor_id: '',
-    installer_ids: [] as string[],
-    truck_ids: [] as string[],
-    driver_ids: [] as string[],
-  });
-  const [eksekusiError, setEksekusiError] = useState('');
-  const [stockReady, setStockReady] = useState(false);
+  const [eksekusiForm, setEksekusiForm]       = useState(emptyEksekusi);
+  const [eksekusiError, setEksekusiError]     = useState('');
+  const [stockReady, setStockReady]           = useState(false);
+  const [mandorList, setMandorList]           = useState<any[]>([]);
+  const [tukangList, setTukangList]           = useState<any[]>([]);
+  const [sopirList, setSopirList]             = useState<any[]>([]);
+  const [truckList, setTruckList]             = useState<any[]>([]);
 
-  // List untuk dropdown eksekusi
-  const [mandorList, setMandorList] = useState<any[]>([]);
-  const [tukangList, setTukangList] = useState<any[]>([]);
-  const [sopirList, setSopirList] = useState<any[]>([]);
-  const [truckList, setTruckList] = useState<any[]>([]);
+  // Foto progres
+  const [fotoList, setFotoList]         = useState<any[]>([]);
+  const [loadingFoto, setLoadingFoto]   = useState(false);
+  const [fotoForm, setFotoForm]         = useState({ notes: '' });
+  const [fotoFile, setFotoFile]         = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview]   = useState<string | null>(null);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [fotoError, setFotoError]       = useState('');
+  const [lightbox, setLightbox]         = useState<string | null>(null);
+  const fotoFileRef = useRef<HTMLInputElement>(null);
 
-  const isAdmin = currentUser.roles.includes('Admin');
+  // Derived
+  const isAdmin      = currentUser.roles.includes('Admin');
   const isTeknikSipil = currentUser.roles.includes('Teknik_Sipil');
-  const canEdit = isAdmin || isTeknikSipil;
-  const supabase = createClient();
+  const canEdit      = isAdmin || isTeknikSipil;
 
   const filtered = projects.filter((p) => {
     const matchSearch =
@@ -198,16 +222,12 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
         .single();
       setEksekusiData(exec ?? null);
 
-      if (exec) {
-        setEksekusiForm({
-          mandor_id: exec.mandor_id ?? '',
-          installer_ids: exec.project_execution_installers?.map((i: any) => i.user.id) ?? [],
-          truck_ids: exec.project_execution_trucks?.map((t: any) => t.truck.id) ?? [],
-          driver_ids: exec.project_execution_drivers?.map((d: any) => d.user.id) ?? [],
-        });
-      } else {
-        setEksekusiForm({ mandor_id: '', installer_ids: [], truck_ids: [], driver_ids: [] });
-      }
+      setEksekusiForm(exec ? {
+        mandor_id:     exec.mandor_id ?? '',
+        installer_ids: exec.project_execution_installers?.map((i: any) => i.user.id) ?? [],
+        truck_ids:     exec.project_execution_trucks?.map((t: any) => t.truck.id) ?? [],
+        driver_ids:    exec.project_execution_drivers?.map((d: any) => d.user.id) ?? [],
+      } : emptyEksekusi);
 
       const { data: roles } = await supabase
         .from('user_roles')
@@ -225,11 +245,11 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
 
         const mandorIds = roles?.filter((r: any) => r.role === 'Mandor').map((r: any) => r.user_id) ?? [];
         const tukangIds = roles?.filter((r: any) => r.role === 'Tukang').map((r: any) => r.user_id) ?? [];
-        const sopirIds  = roles?.filter((r: any) => r.role === 'Sopir').map((r: any) => r.user_id) ?? [];
+        const sopirIds  = roles?.filter((r: any) => r.role === 'Sopir').map((r: any) => r.user_id)  ?? [];
 
         setMandorList(users?.filter((u: any) => mandorIds.includes(u.id)) ?? []);
         setTukangList(users?.filter((u: any) => tukangIds.includes(u.id)) ?? []);
-        setSopirList(users?.filter((u: any) => sopirIds.includes(u.id)) ?? []);
+        setSopirList(users?.filter((u: any) => sopirIds.includes(u.id))  ?? []);
       }
 
       const { data: trucks } = await supabase
@@ -239,6 +259,20 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
       setTruckList(trucks ?? []);
     } finally {
       setLoadingEksekusi(false);
+    }
+  };
+
+  const fetchFoto = async (projectId: string) => {
+    setLoadingFoto(true);
+    try {
+      const { data } = await supabase
+        .from('progress_photos')
+        .select('*, uploader:uploaded_by(id, full_name), approver:approved_by(id, full_name)')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+      setFotoList(data ?? []);
+    } finally {
+      setLoadingFoto(false);
     }
   };
 
@@ -258,15 +292,15 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
   const openEdit = (p: Project) => {
     setSelected(p);
     setForm({
-      project_name: p.project_name,
-      client_name: p.client_name,
+      project_name:   p.project_name,
+      client_name:    p.client_name,
       client_address: p.client_address ?? '',
-      client_phone: p.client_phone ?? '',
-      start_date: p.start_date ?? '',
-      end_target: p.end_target ?? '',
-      warehouse_id: p.warehouse_id ?? '',
-      status: p.status,
-      boq_file_url: p.boq_file_url ?? '',
+      client_phone:   p.client_phone   ?? '',
+      start_date:     p.start_date     ?? '',
+      end_target:     p.end_target     ?? '',
+      warehouse_id:   p.warehouse_id   ?? '',
+      status:         p.status,
+      boq_file_url:   p.boq_file_url   ?? '',
     });
     setBoqFile(null);
     setError('');
@@ -280,8 +314,14 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
     setEditBOQ(null);
     setShowEksekusiForm(false);
     setEksekusiError('');
+    setFotoList([]);
+    setFotoForm({ notes: '' });
+    setFotoFile(null);
+    setFotoPreview(null);
+    setFotoError('');
     fetchBOQ(p.id);
     fetchEksekusi(p.id);
+    fetchFoto(p.id);
     setModalMode('detail');
   };
 
@@ -292,7 +332,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch('/api/upload-boq', { method: 'POST', body: fd });
+      const res    = await fetch('/api/upload-boq', { method: 'POST', body: fd });
       const result = await res.json();
       if (result.error) { setError(result.error); return null; }
       return result.url;
@@ -308,7 +348,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
     if (!pendingBOQForm.material_id) return setPendingBOQError('Material harus dipilih.');
     if (!pendingBOQForm.quantity_required || isNaN(parseFloat(pendingBOQForm.quantity_required)))
       return setPendingBOQError('Jumlah harus diisi.');
-    const mat = materials.find((m) => m.id === pendingBOQForm.material_id);
+    const mat    = materials.find((m) => m.id === pendingBOQForm.material_id);
     const already = pendingBOQ.find((p) => p.material_id === pendingBOQForm.material_id);
     if (already) return setPendingBOQError('Material ini sudah ada di daftar BOQ.');
     setPendingBOQError('');
@@ -323,7 +363,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
 
   const handleSubmit = () => {
     if (!form.project_name.trim()) return setError('Nama proyek harus diisi.');
-    if (!form.client_name.trim()) return setError('Nama klien harus diisi.');
+    if (!form.client_name.trim())  return setError('Nama klien harus diisi.');
     setError('');
 
     startTransition(async () => {
@@ -336,14 +376,14 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
         }
 
         const payload = {
-          project_name: form.project_name,
-          client_name: form.client_name,
+          project_name:   form.project_name,
+          client_name:    form.client_name,
           client_address: form.client_address,
-          client_phone: form.client_phone,
-          start_date: form.start_date || '',
-          end_target: form.end_target || '',
-          warehouse_id: form.warehouse_id || '',
-          boq_file_url: boqUrl,
+          client_phone:   form.client_phone,
+          start_date:     form.start_date  || '',
+          end_target:     form.end_target  || '',
+          warehouse_id:   form.warehouse_id || '',
+          boq_file_url:   boqUrl,
         };
 
         if (modalMode === 'create') {
@@ -400,11 +440,11 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
       try {
         const { data, error } = await supabase.functions.invoke('eksekusi-project', {
           body: {
-            project_id: selected!.id,
-            mandor_id: eksekusiForm.mandor_id || null,
+            project_id:    selected!.id,
+            mandor_id:     eksekusiForm.mandor_id || null,
             installer_ids: eksekusiForm.installer_ids,
-            truck_ids: eksekusiForm.truck_ids,
-            driver_ids: eksekusiForm.driver_ids,
+            truck_ids:     eksekusiForm.truck_ids,
+            driver_ids:    eksekusiForm.driver_ids,
           },
         });
 
@@ -421,6 +461,57 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
     });
   };
 
+  const handleUploadFoto = () => {
+    if (!fotoFile) return setFotoError('Pilih foto terlebih dahulu.');
+    setFotoError('');
+
+    startTransition(async () => {
+      try {
+        setUploadingFoto(true);
+        const fd = new FormData();
+        fd.append('file', fotoFile);
+        const res    = await fetch('/api/upload-progress-photo', { method: 'POST', body: fd });
+        const result = await res.json();
+        setUploadingFoto(false);
+
+        if (result.error) return setFotoError(result.error);
+
+        const { uploadProgressPhoto } = await import('@/app/actions/progress-photos');
+        const action = await uploadProgressPhoto({
+          project_id: selected!.id,
+          photo_url:  result.url,
+          notes:      fotoForm.notes,
+        });
+
+        if (action?.error) return setFotoError(action.error);
+
+        setFotoFile(null);
+        setFotoPreview(null);
+        setFotoForm({ notes: '' });
+        fetchFoto(selected!.id);
+      } catch {
+        setFotoError('Terjadi kesalahan saat upload.');
+        setUploadingFoto(false);
+      }
+    });
+  };
+
+  const handleReviewFoto = (id: string, status: 'Approved' | 'Rejected') => {
+    startTransition(async () => {
+      const { reviewProgressPhoto } = await import('@/app/actions/progress-photos');
+      await reviewProgressPhoto(id, status);
+      fetchFoto(selected!.id);
+    });
+  };
+
+  const handleDeleteFoto = (id: string) => {
+    startTransition(async () => {
+      const { deleteProgressPhoto } = await import('@/app/actions/progress-photos');
+      await deleteProgressPhoto(id);
+      fetchFoto(selected!.id);
+    });
+  };
+
   const confirmDelete = () => {
     if (!deleteModal) return;
     startTransition(async () => {
@@ -429,12 +520,12 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
     });
   };
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
+  // ─── Style Helpers ────────────────────────────────────────────────────────────
 
   const stockBadge = (status?: string) => {
     if (status === 'Cukup')  return <Badge label="Cukup"  variant="success" />;
     if (status === 'Kurang') return <Badge label="Kurang" variant="warning" />;
-    if (status === 'Kosong') return <Badge label="Kosong" variant="error" />;
+    if (status === 'Kosong') return <Badge label="Kosong" variant="error"   />;
     return <Badge label="—" variant="default" />;
   };
 
@@ -465,6 +556,12 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
     fontWeight: active ? '600' : '400',
     userSelect: 'none',
   });
+
+  const errorBox: React.CSSProperties = {
+    backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+    borderRadius: '8px', padding: '10px 12px',
+    color: 'var(--error)', fontSize: '13px',
+  };
 
   // ─── Render Helpers ───────────────────────────────────────────────────────────
 
@@ -500,7 +597,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
         <div style={{ display: 'flex', gap: '6px' }}>
           <Button size="sm" variant="ghost" onClick={() => openDetail(p)}>Detail & BOQ</Button>
           {canEdit && <Button size="sm" variant="secondary" onClick={() => openEdit(p)}>Edit</Button>}
-          {isAdmin && <Button size="sm" variant="danger" onClick={() => setDeleteModal(p)}>Hapus</Button>}
+          {isAdmin  && <Button size="sm" variant="danger"    onClick={() => setDeleteModal(p)}>Hapus</Button>}
         </div>
       ),
     },
@@ -597,10 +694,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
       </div>
 
       {pendingBOQError && (
-        <div style={{
-          backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '6px',
-          padding: '8px 10px', color: 'var(--error)', fontSize: '12px', marginBottom: '10px',
-        }}>{pendingBOQError}</div>
+        <div style={{ ...errorBox, fontSize: '12px', marginBottom: '10px' }}>{pendingBOQError}</div>
       )}
 
       <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '12px' }}>
@@ -687,11 +781,12 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
               <Badge label={`TS: ${selected.ts_approval}`} variant={approvalVariant[selected.ts_approval] ?? 'default'} />
             </div>
           </div>
+
           <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
             {[
               { label: 'Warehouse', value: selected.warehouse?.name ?? '-' },
               { label: 'Mulai',    value: selected.start_date ? new Date(selected.start_date).toLocaleDateString('id-ID') : '-' },
-              { label: 'Target',  value: selected.end_target  ? new Date(selected.end_target).toLocaleDateString('id-ID')  : '-' },
+              { label: 'Target',   value: selected.end_target  ? new Date(selected.end_target).toLocaleDateString('id-ID')  : '-' },
               { label: 'HP Klien', value: selected.client_phone ?? '-' },
             ].map((item) => (
               <div key={item.label}>
@@ -700,6 +795,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
               </div>
             ))}
           </div>
+
           {selected.boq_file_url && (
             <a href={selected.boq_file_url} target="_blank" rel="noopener noreferrer"
               style={{ display: 'inline-block', marginTop: '10px', fontSize: '12px', color: 'var(--primary)', fontWeight: '600' }}>
@@ -723,12 +819,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
                 {editBOQ ? `Edit Item: ${editBOQ.material?.material_name}` : '+ Tambah Item BOQ'}
               </div>
 
-              {boqError && (
-                <div style={{
-                  backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '6px',
-                  padding: '8px 10px', color: 'var(--error)', fontSize: '12px', marginBottom: '10px',
-                }}>{boqError}</div>
-              )}
+              {boqError && <div style={{ ...errorBox, fontSize: '12px', marginBottom: '10px' }}>{boqError}</div>}
 
               <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                 <div style={{ flex: 2 }}>
@@ -853,7 +944,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
               {[
                 { label: 'Mandor', items: eksekusiData.mandor ? [eksekusiData.mandor] : [] },
                 { label: 'Tukang', items: eksekusiData.project_execution_installers?.map((i: any) => i.user) ?? [] },
-                { label: 'Sopir',  items: eksekusiData.project_execution_drivers?.map((d: any) => d.user) ?? [] },
+                { label: 'Sopir',  items: eksekusiData.project_execution_drivers?.map((d: any) => d.user)    ?? [] },
               ].map((group) => (
                 <div key={group.label}>
                   <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
@@ -917,20 +1008,12 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
           {showEksekusiForm && (isAdmin || currentUser.roles.includes('Kepala_WH')) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {!stockReady && (
-                <div style={{
-                  backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-                  borderRadius: '8px', padding: '12px', color: 'var(--error)', fontSize: '13px',
-                }}>
+                <div style={{ ...errorBox, padding: '12px' }}>
                   ⚠️ Stok belum mencukupi untuk semua item BOQ. Pastikan semua item berstatus <strong>Cukup</strong> sebelum eksekusi.
                 </div>
               )}
 
-              {eksekusiError && (
-                <div style={{
-                  backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-                  borderRadius: '8px', padding: '10px 12px', color: 'var(--error)', fontSize: '13px',
-                }}>{eksekusiError}</div>
-              )}
+              {eksekusiError && <div style={errorBox}>{eksekusiError}</div>}
 
               {/* Mandor */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -1025,6 +1108,123 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
             </div>
           )}
         </div>
+
+        {/* Foto Progres Section */}
+        <div style={{ marginTop: '24px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+          <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-primary)', marginBottom: '16px' }}>
+            Foto Progres
+          </div>
+
+          {/* Upload Form */}
+          <div style={{
+            backgroundColor: '#F8FAFC', borderRadius: '8px', padding: '14px',
+            marginBottom: '16px', border: '1px solid var(--border)',
+          }}>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '10px' }}>
+              Upload Foto
+            </div>
+
+            {fotoError && <div style={{ ...errorBox, fontSize: '12px', marginBottom: '10px' }}>{fotoError}</div>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button type="button" onClick={() => fotoFileRef.current?.click()}
+                  style={{
+                    padding: '8px 16px', border: '1px solid var(--border)',
+                    borderRadius: '8px', fontSize: '13px', cursor: 'pointer',
+                    backgroundColor: 'var(--surface)', color: 'var(--text-primary)',
+                  }}>
+                  📷 Pilih Foto
+                </button>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  {fotoFile ? fotoFile.name : 'Belum ada foto dipilih'}
+                </span>
+              </div>
+              <input ref={fotoFileRef} type="file" accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setFotoFile(file);
+                  setFotoPreview(file ? URL.createObjectURL(file) : null);
+                }} />
+
+              {fotoPreview && (
+                <img src={fotoPreview} alt="preview"
+                  style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }} />
+              )}
+
+              <Input label="Catatan (opsional)" value={fotoForm.notes}
+                onChange={(v) => setFotoForm({ notes: v })} placeholder="Deskripsi foto..." />
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button size="sm" onClick={handleUploadFoto} disabled={isPending || uploadingFoto}>
+                  {uploadingFoto ? 'Mengupload...' : '📤 Upload Foto'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Foto List */}
+          {loadingFoto ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+              Memuat foto...
+            </div>
+          ) : fotoList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+              Belum ada foto progres
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+              {fotoList.map((foto: any) => (
+                <div key={foto.id} style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', fontSize: '12px' }}>
+                  <img src={foto.photo_url} alt="progres"
+                    onClick={() => setLightbox(foto.photo_url)}
+                    style={{ width: '100%', height: '130px', objectFit: 'cover', cursor: 'zoom-in', display: 'block' }} />
+                  <div style={{ padding: '8px' }}>
+                    {foto.notes && (
+                      <div style={{ color: 'var(--text-primary)', marginBottom: '4px', fontWeight: '500' }}>
+                        {foto.notes}
+                      </div>
+                    )}
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      {foto.uploader?.full_name} · {new Date(foto.created_at).toLocaleDateString('id-ID')}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Badge
+                        label={foto.status ?? 'Pending'}
+                        variant={approvalVariant[foto.status] ?? 'warning'}
+                      />
+                      {isAdmin && foto.status === 'Pending' && (
+                        <>
+                          <Button size="sm" variant="secondary"
+                            onClick={() => handleReviewFoto(foto.id, 'Approved')}>✓</Button>
+                          <Button size="sm" variant="danger"
+                            onClick={() => handleReviewFoto(foto.id, 'Rejected')}>✗</Button>
+                        </>
+                      )}
+                      {(isAdmin || foto.uploader?.id === currentUser.id) && (
+                        <Button size="sm" variant="danger"
+                          onClick={() => handleDeleteFoto(foto.id)}>🗑</Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Lightbox */}
+        {lightbox && (
+          <div onClick={() => setLightbox(null)} style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, cursor: 'zoom-out',
+          }}>
+            <img src={lightbox} alt="fullsize"
+              style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px', objectFit: 'contain' }} />
+          </div>
+        )}
       </div>
     );
   };
@@ -1084,12 +1284,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
           </>
         }>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {error && (
-            <div style={{
-              backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-              borderRadius: '8px', padding: '10px 12px', color: 'var(--error)', fontSize: '13px',
-            }}>{error}</div>
-          )}
+          {error && <div style={errorBox}>{error}</div>}
           {renderProjectFields()}
           {renderPendingBOQ()}
         </div>
@@ -1107,12 +1302,7 @@ export function ProyekClient({ projects, warehouses, materials, currentUser }: P
           </>
         }>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {error && (
-            <div style={{
-              backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-              borderRadius: '8px', padding: '10px 12px', color: 'var(--error)', fontSize: '13px',
-            }}>{error}</div>
-          )}
+          {error && <div style={errorBox}>{error}</div>}
           {renderProjectFields()}
         </div>
       </Modal>
